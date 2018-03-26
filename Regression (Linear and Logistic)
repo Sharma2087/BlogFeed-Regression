@@ -1,0 +1,478 @@
+#Reading CSV from local system
+blogData <- read.csv('C:\\Users\\Rahul\\Documents\\Spring 2018 Courses\\ML\\BlogFeedback\\blogData_train.csv',header=FALSE, sep=",")
+
+
+#Experiment 1: -
+
+#Printing number of columns
+test_feb_Set1 <- read.csv('C:\\Users\\Rahul\\Documents\\Spring 2018 Courses\\ML\\BlogFeedback\\blogData_test-2012.02.08.00_00.csv',header=FALSE, sep=",")
+test_feb_Set2 <- read.csv('C:\\Users\\Rahul\\Documents\\Spring 2018 Courses\\ML\\BlogFeedback\\blogData_test-2012.02.19.00_00.csv',header=FALSE, sep=",")
+test_mar_Set1 <- read.csv('C:\\Users\\Rahul\\Documents\\Spring 2018 Courses\\ML\\BlogFeedback\\blogData_test-2012.03.30.01_00.csv',header=FALSE, sep=",")
+test_mar_Set2 <- read.csv('C:\\Users\\Rahul\\Documents\\Spring 2018 Courses\\ML\\BlogFeedback\\blogData_test-2012.03.31.01_00.csv',header=FALSE, sep=",")
+
+
+#Setting Seed; necessary for exact results
+set.seed(234)
+
+#Test Sets for February
+
+
+test_feb_Set1 = test_feb_Set1[,c(51:60,281)]
+colnames(test_feb_Set1) <- c(51:60,"Target")
+
+
+test_feb_Set2 = test_feb_Set2[,c(51:60,281)]
+colnames(test_feb_Set2) <- c(51:60,"Target")
+
+
+#Test Sets for March
+test_mar_Set1 = test_mar_Set1[,c(51:60,281)]
+colnames(test_mar_Set1) <- c(51:60,"Target")
+
+test_mar_Set2 = test_mar_Set2[,c(51:60,281)]
+colnames(test_mar_Set2) <- c(51:60,"Target")
+
+
+#*************** Linear Regression; Experiment #1
+
+#Creating Feature Set and Target Variable profile
+
+blogData = blogData[,c(51:60,281)]
+colnames(blogData) <- c(51:60,"Target")
+
+
+#Model Built
+Model_LM_1 <- lm(formula = Target ~ .,data = blogData)
+
+#Summary
+summary(Model_LM_1)
+
+#Residual standard error: 33.19 on 52388 degrees of freedom
+#Multiple R-squared:  0.2255,	Adjusted R-squared:  0.2254 
+#F-statistic:  1906 on 8 and 52388 DF,  p-value: < 2.2e-16
+
+
+#Prediction and Check
+Prediction_feb_Set1 <- predict.lm(Model_LM_1, newdata=test_feb_Set1)
+#mean squared error: -
+error_1 <- (test_feb_Set1$Target - Prediction_feb_Set1) 
+print(mean(error_1^2))
+
+
+
+
+#Using a polynomial; just a slight improvement; not significant!
+LR_model_X2 <- lm(Feedbacks_Y~poly(BlogFeatures_X,2,raw=TRUE))
+summary(LR_model_X2)
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#Residual standard error: 32.95 on 52352 degrees of freedom
+#Multiple R-squared:  0.2371,	Adjusted R-squared:  0.2364 
+#F-statistic: 369.7 on 44 and 52352 DF,  p-value: < 2.2e-16
+
+
+#based on tests; using variable #52 has the highest likelihood of explainign the regression; all othes have R square valeu below 10 %
+#still not a good model :(
+featureSingle=blogData[,52:54]
+SingleFeature=as.matrix(featureSingle)
+LR_Model_SingleVar=lm(Feedbacks_Y~poly(SingleFeature,2,raw = TRUE))
+summary(LR_Model_SingleVar)
+
+
+
+
+
+#For Feb test sets
+Prediction_feb_Set1 <- predict.lm(Model_LM_1, newdata=test_feb_Set1)
+
+Prediction_feb_Set2 <- predict(Model_LM_1,newdata=newdata=test_feb_Set2)
+
+
+
+
+#RSS on Prediction: -
+RSS=sum((Feedbacks_Y - Prediction_feb_Set1)^2)
+RSS # comes out to be 57698082; way way off!!!
+
+
+#> summary(Prediction_feb_Set1)
+#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#-30.740   2.140   2.240   6.765   3.597 434.900 
+
+#Comparing>> Way off!
+head(Prediction_feb_Set2)
+head(test_feb_Set2_Y)
+
+Prediction_feb_Set1
+
+#For March test sets
+Prediction_mar_Set1 <- predict(Model_LM_1,newdata = test_mar_Set1)
+Prediction_mar_Set2 <- predict(Model_LM_1,newdata = test_mar_Set2)
+
+# ***
+
+#Do residual plots to see if outliers are there, and try to fit a model after removing the outliers
+#Since it's difficult to decide on how large it needs to be, we should instead use "Studentized" residuals plot; 
+#obtained by dividing each residual by estimated standard error. Values greater than 3 are possible outliers
+
+
+# ***
+
+
+#writing function for mean squared error for each test set
+mse <- function(error)
+{
+  mean(error^2)
+}
+
+error_1 <- (test_feb_Set1$Target - Prediction_feb_Set1) 
+error_2 <- (test_feb_Set2$Target - Prediction_mar_Set1)  
+error_3 <- (test_mar_Set1$Target - Prediction_mar_Set1) 
+error_4 <- (test_mar_Set2$Target - Prediction_mar_Set2) 
+
+
+#Mean squared errors for predictions against tests!
+mse(error_1)
+mse(error_2)
+mse(error_3)
+mse(error_4)
+
+#> mse(error_1)
+#[1] 4343.796
+
+
+
+#For better feature selection: -
+library(caret)
+library(mlbench)
+ctrl <- rfeControl(functions = lmFuncs, method = "repeatedcv", repeats = 5,verbose = FALSE)
+
+subset = c(1:20000,20000:52397)
+
+lmProfile <- rfe(blogData[1:10], blogData$Target,sizes = subsets,rfeControl = ctrl)
+
+lmProfile
+
+#The top 5 variables (out of 10):
+#columns -> 59, 56, 57, 52, 58
+predictors(lmProfile)
+#Creating Feature Set and Target Variable profile
+
+BlogFeatures_X = cbind(blogData$59 + blogData$56 + blogData$57 + blogData$52 + blogData$58)
+
+
+Feedbacks_Y = blogData$Target
+
+
+
+#*************** Logistic Regression; Experiment #1
+                                                    #using same variables and function
+
+
+
+#Setting Binary output for logistic regression; 0 implies no feedback, and 1 implies feedback
+#There are far too many 0s to transform this inot a hi or low range categories, hence I'm covnerting it to either feedback or not for simplicity
+Feedbacks_Y[Feedbacks_Y>0] <- 1
+
+
+blogData = blogData[,c(51:60,281)]
+colnames(blogData) <- c(51:60,"Target")
+blogData$Target[blogData$Target>0]=1
+
+
+#Model Built
+Model_LM_1 <- lm(formula = Target ~ .,data = blogData)
+
+
+textualFeatures=BlogFeatures_X
+Model_LR_1=glm(formula=Target~.,data=blogData, family = binomial)
+#Gives following warning: -
+#Warning message:
+#glm.fit: fitted probabilities numerically 0 or 1 occurred
+
+summary(Model_LR_1)
+
+#(Dispersion parameter for binomial family taken to be 1)
+#Null deviance: 68446  on 52396  degrees of freedom
+#Residual deviance: 56467  on 52388  degrees of freedom
+#AIC: 56485
+
+gl=predict(Model_LR_1, type="response")
+
+#Test Sets for February
+test_feb_Set1_X 
+test_feb_Set1_Y 
+
+test_feb_Set2_X 
+test_feb_Set2_Y 
+
+#Test Sets for March
+test_mar_Set1_X 
+test_mar_Set1_Y 
+
+test_mar_Set2_X
+test_mar_Set2_Y 
+ #Predictions: -
+Prediction_feb_Set1=predict.glm(Model_LR_1,newdata=test_feb_Set1)
+Prediction_feb_Set1 <- data.frame(cbind(actual=BlogFeatures_X,predicted=Prediction_feb_Set1))
+
+
+Prediction_March_Set1=predict.glm(Model_LR_1,newdata=data.frame(BlogFeatures_X=data.frame((test_mar_Set1_X)),type="response"))
+Prediction_March_Set1 <- data.frame(cbind(actual=BlogFeatures_X,predicted=Prediction_March_Set1))
+head(Prediction_March_Set1)
+
+#confusion Matrix
+library(caret)
+typeof(test_feb_Set1_Y)
+referenceVars=test_feb_Set1_Y
+referenceVars[referenceVars>0]=1
+referenceVars
+unl=unlist(Prediction_feb_Set1)
+unl
+confusionMatrix(unlist(Prediction_feb_Set1), referenceVars)  
+
+
+
+#Mean Squared Errors: -
+
+error_1 <- (test_feb_Set1$Target - Prediction_feb_Set1) 
+error_2 <- (test_mar_Set1_Y - Prediction_March_Set1) 
+mse(error_1)
+mse(error_2)
+
+#> mse(error_1)
+#[1] 4321.321
+#> mse(error_2)
+#[1] 2381.418
+
+
+
+
+#Experiment 2: -
+
+#Printing number of columns
+test_feb_Set1 <- read.csv('C:\\Users\\Rahul\\Documents\\Spring 2018 Courses\\ML\\BlogFeedback\\blogData_test-2012.02.28.00_00.csv',header=FALSE, sep=",")
+test_feb_Set2 <- read.csv('C:\\Users\\Rahul\\Documents\\Spring 2018 Courses\\ML\\BlogFeedback\\blogData_test-2012.02.29.00_00.csv',header=FALSE, sep=",")
+test_mar_Set1 <- read.csv('C:\\Users\\Rahul\\Documents\\Spring 2018 Courses\\ML\\BlogFeedback\\blogData_test-2012.03.30.01_00.csv',header=FALSE, sep=",")
+test_mar_Set2 <- read.csv('C:\\Users\\Rahul\\Documents\\Spring 2018 Courses\\ML\\BlogFeedback\\blogData_test-2012.03.31.01_00.csv',header=FALSE, sep=",")
+
+typeof(test_feb_Set2)
+
+#Setting Seed; necessary for exact results
+set.seed(234)
+
+#Test Sets for February
+test_feb_Set1_X = test_feb_Set1[,63:262]
+test_feb_Set1_Y = test_feb_Set1[,281]
+
+test_feb_Set2_X = test_feb_Set2[,63:262]
+test_feb_Set2_Y = test_feb_Set2[,281]
+
+#Test Sets for March
+test_mar_Set1_X = test_mar_Set1[,63:262]
+test_mar_Set1_Y = test_mar_Set1[,281]
+
+test_mar_Set2_X = test_mar_Set2[,63:262]
+test_mar_Set2_Y = test_mar_Set2[,281]
+
+
+#*************** Linear Regression; Experiment #2
+
+#Creating Feature Set and Target Variable profile
+feature = blogData[,63:262]
+BlogFeatures_X=as.matrix(feature)
+Feedbacks_Y = blogData[,281]
+
+
+# BlogFeatures_X= BlogFeatures_X[,-55]
+# BlogFeatures_X= BlogFeatures_X[,-60]
+
+#Model Built
+Model_LM_1 <- lm(Feedbacks_Y~BlogFeatures_X)
+
+#Summary
+summary(Model_LM_1)
+plot(log(Model_LM_1)
+     
+
+
+
+     #Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+     
+     #Residual standard error: 37.27 on 52218 degrees of freedom
+     #Multiple R-squared:  0.02655,	Adjusted R-squared:  0.02323 
+     #F-statistic: 8.001 on 178 and 52218 DF,  p-value: < 2.2e-16
+
+#Very low R square value implies negligible amount of featues are explained by regression (about 2%), i.e. almost all the variability in response (feedback or not) is not explained by regression at all!
+#RSE although low, doesn't warrant a good prediction.
+#A low p value for intercept implies that feedbacks are there without even feature presence. High p-value implies we can safely accept null hypothesis, that feaures have no effect on feedbacks.
+#Most featuers are collinear, some are derived from other columns as well, and hence not suited for the prediction model.
+#Moreover, due to a large number of rows (subjective), f-statisit is about 8, that also implies for larger number of rows, value just over 1 is enough to 
+#reject null hypothesis (that these feaures in total contribute to feedbacks), but is this number n relatively large for that. Not conclusive!
+
+
+#Annova Summary for Sum Sqaured; to finally get Mean Squared Error
+summary.aov(Model_LM_1)
+
+
+#Residual standard error: 37.71 on 52395 degrees of freedom
+#
+#Residual standard error: 33.19 on 52388 degrees of freedom
+#Multiple R-squared:  1.962e-05,	Adjusted R-squared:  5.33e-07 
+#F-statistic: 1.028 on 1 and 52395 DF,  p-value: 0.3107
+
+#Mean Squared Error, from residuals: For this model!
+mean(Model_LM_1$residuals^2)
+#1384.012
+
+#Predicting against test sets
+
+#For Feb test sets
+Prediction_feb_Set1=predict.glm(Model_LR_1,newdata=data.frame(BlogFeatures_X=data.frame((test_feb_Set1_X)),type="response"))
+Prediction_feb_Set1 <- data.frame(cbind(actual=BlogFeatures_X,predicted=Prediction_feb_Set1))
+
+Prediction_feb_Set2=predict.glm(Model_LR_1,newdata=data.frame(BlogFeatures_X=data.frame((test_feb_Set2_X)),type="response"))
+Prediction_feb_Set2 <- data.frame(cbind(actual=BlogFeatures_X,predicted=Prediction_feb_Set2))
+
+summary(Prediction_feb_Set1)
+summary(Prediction_feb_Set2)
+
+#RSS on Prediction: -
+RSS=sum((Feedbacks_Y - Prediction_feb_Set1)^2)
+RSS # comes out to be 15439463502; way way off!!!
+
+
+
+#> summary(Prediction_feb_Set1)
+#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#-30.740   2.140   2.240   6.765   3.597 434.900 
+
+#Comparing>> Way off!
+head(Prediction_feb_Set2)
+head(test_feb_Set2_Y)
+
+Prediction_feb_Set1
+
+#For March test sets
+# BlogFeatures_X= BlogFeatures_X[,-55]
+# BlogFeatures_X= BlogFeatures_X[,-60]
+# 
+# test_mar_Set1_X=test_mar_Set1_X[,-55]
+# test_mar_Set1_X=test_mar_Set1_X[,-60]
+
+
+Prediction_mar_Set1 <- predict.lm(Model_LM_1,newdata=data.frame(BlogFeatures_X=data.frame((test_mar_Set1_X)),type="response"))
+Prediction_mar_Set1 <- data.frame(cbind(actual=BlogFeatures_X,predicted=Prediction_mar_Set1))
+
+Prediction_mar_Set2 <- predict.lm(Model_LM_1,newdata=data.frame(BlogFeatures_X=data.frame((test_mar_Set2_X)),type="response"))
+Prediction_mar_Set2 <- data.frame(cbind(actual=BlogFeatures_X,predicted=Prediction_mar_Set2))
+
+
+
+
+# ***
+
+#Do residual plots to see if outliers are there, and try to fit a model after removing the outliers
+#Since it's difficult to decide on how large it needs to be, we should instead use "Studentized" residuals plot; 
+#obtained by dividing each residual by estimated standard error. Values greater than 3 are possible outliers
+
+
+# ***
+
+
+#writing function for mean squared error for each test set
+mse <- function(error)
+{
+  mean(error^2)
+}
+
+error_1 <- (test_feb_Set1_Y - Prediction_feb_Set1) 
+error_2 <- (test_mar_Set2_Y - Prediction_feb_Set2)  
+error_3 <- (test_mar_Set1_Y - Prediction_mar_Set1) 
+error_4 <- (test_mar_Set2_Y - Prediction_mar_Set2) 
+
+
+
+
+#Mean squared errors for predictions against tests!
+mse(error_1)
+mse(error_2)
+mse(error_3)
+mse(error_4)
+
+# > mse(error_1)
+# [1] 1208.88
+# > mse(error_2)
+# [1] 2325.86
+# > mse(error_3)
+# [1] 2356.961
+# > mse(error_4)
+# [1] 2325.733
+
+#*************** Logistic Regression; Experiment #2
+
+
+
+
+
+feature = blogData[,63:262]
+BlogFeatures_X=as.matrix(feature)
+Feedbacks_Y = blogData[,281]
+
+#Setting Binary output for logistic regression; 0 implies no feedback, and 1 implies feedback
+Feedbacks_Y[Feedbacks_Y>0] <- 1
+
+textualFeatures=BlogFeatures_X
+
+Model_LR_1=glm(Feedbacks_Y~textualFeatures, family = binomial)
+#Gives following warning: -
+#Warning message:
+#glm.fit: fitted probabilities numerically 0 or 1 occurred
+
+summary(Model_LR_1)
+
+# (Dispersion parameter for binomial family taken to be 1)
+# 
+# Null deviance: 68446  on 52396  degrees of freedom
+# Residual deviance: 66117  on 52218  degrees of freedom
+# AIC: 66475
+# 
+# Number of Fisher Scoring iterations: 11
+
+gl=predict(Model_LR_1, type="response")
+
+#Test Sets for February
+test_feb_Set1_X 
+test_feb_Set1_Y 
+
+test_feb_Set2_X 
+test_feb_Set2_Y 
+
+#Test Sets for March
+test_mar_Set1_X 
+test_mar_Set1_Y 
+
+test_mar_Set2_X
+test_mar_Set2_Y 
+#Predictions: -
+
+Prediction_feb_Set1 <- predict.lm(Model_LM_1,newdata=data.frame(BlogFeatures_X=data.frame((test_feb_Set1_X)),type="response"))
+Prediction_feb_Set1 <- data.frame(cbind(actual=BlogFeatures_X,predicted=Prediction_feb_Set1))
+
+
+Prediction_March_Set1=predict.glm(Model_LR_1,newdata=data.frame(BlogFeatures_X=data.frame((test_mar_Set1_X)),type="response"))
+Prediction_March_Set1 <- data.frame(cbind(actual=BlogFeatures_X,predicted=Prediction_March_Set1))
+
+
+#Mean Squared Errors: -
+
+error_1 <- (test_feb_Set1_Y - Prediction_feb_Set1) 
+error_2 <- (test_mar_Set1_Y - Prediction_March_Set1) 
+mse(error_1)
+mse(error_2)
+
+> mse(error_1)
+[1] 1208.693
+> mse(error_2)
+[1] 2356.957
+
